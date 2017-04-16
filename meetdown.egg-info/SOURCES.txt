@@ -1,0 +1,9 @@
+MANIFEST.in
+meetdown/__init__.py
+meetdown/meetdown.py
+meetdown/schema.sql
+meetdown.egg-info/PKG-INFO
+meetdown.egg-info/SOURCES.txt
+meetdown.egg-info/dependency_links.txt
+meetdown.egg-info/requires.txt
+meetdown.egg-info/top_level.txt
