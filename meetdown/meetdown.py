@@ -53,9 +53,27 @@ def initdb_command():
 @app.route('/users', methods=['GET'])
 def get_users():
     db = get_db()
-    cur = db.execute('select user_id, username, email from users order by user_id desc');
-    users = cur.fetchall()
-    response = [ dict(u) for u in users]
+    cur = db.execute("""select
+            users.user_id,
+            username,
+            email,
+            GROUP_CONCAT(DISTINCT events.title) as events,
+            GROUP_CONCAT(groups.name) as groups
+            from users
+            LEFT OUTER JOIN memberships on users.user_id = memberships.user_id
+            LEFT OUTER JOIN groups on memberships.group_id = groups.group_id
+            LEFT OUTER JOIN signups on signups.user_id = users.user_id
+            LEFT OUTER JOIN events on events.event_id = signups.event_id
+            GROUP BY users.user_id, username, email
+            """);
+    users = [dict(u) for u in (cur.fetchall())]
+    response = [{
+        'user_id': u['user_id'],
+        'username': u['username'],
+        'email': u['email'],
+        'events': list(set(u['events'].split(','))) if u['events'] else [],
+        'groups': list(set(u['groups'].split(','))) if u['groups'] else []
+        } for u in users]
     return jsonify(response)
 
 
