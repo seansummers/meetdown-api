@@ -1,8 +1,9 @@
 # all the imports
 import os
 import sqlite3
-from flask import Flask, request, session, g, redirect, url_for, abort, \
-     render_template, flash, jsonify
+from flask import Flask, request, session, g, jsonify
+from flask_graphql import GraphQLView
+import graphene
 
 app = Flask(__name__) # create the application instance :)
 app.config.from_object(__name__) # load config from this file , flaskr.py
@@ -54,17 +55,17 @@ def initdb_command():
 def get_users():
     db = get_db()
     cur = db.execute("""select
-            users.user_id,
+            users.id as user_id,
             username,
             email,
             GROUP_CONCAT(DISTINCT events.title) as events,
             GROUP_CONCAT(groups.name) as groups
             from users
-            LEFT OUTER JOIN memberships on users.user_id = memberships.user_id
-            LEFT OUTER JOIN groups on memberships.group_id = groups.group_id
-            LEFT OUTER JOIN signups on signups.user_id = users.user_id
-            LEFT OUTER JOIN events on events.event_id = signups.event_id
-            GROUP BY users.user_id, username, email
+            LEFT OUTER JOIN memberships on memberships.user_id = users.id
+            LEFT OUTER JOIN groups on groups.id = memberships.group_id
+            LEFT OUTER JOIN signups on signups.user_id = users.id
+            LEFT OUTER JOIN events on events.id = signups.event_id
+            GROUP BY users.id, username, email
             """);
     users = [dict(u) for u in (cur.fetchall())]
     response = [{
@@ -80,7 +81,7 @@ def get_users():
 @app.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
     db = get_db()
-    cur = db.execute('select user_id, username, email from users where user_id = ?', [user_id]);
+    cur = db.execute('select id, username, email from users where id = ?', [user_id]);
     user = cur.fetchone()
     return jsonify(dict(user))
 
@@ -88,7 +89,7 @@ def get_user(user_id):
 @app.route('/groups', methods=['GET'])
 def get_groups():
     db = get_db()
-    cur = db.execute('select group_id, name from groups order by group_id desc');
+    cur = db.execute('select id, name from groups order by id desc');
     rows = cur.fetchall()
     return jsonify([dict(row) for row in rows])
 
@@ -96,7 +97,69 @@ def get_groups():
 @app.route('/groups/<int:group_id>', methods=['GET'])
 def get_group(group_id):
     db = get_db()
-    cur = db.execute('select group_id, name from groups where group_id = ?', [group_id]);
+    cur = db.execute('select id, name from groups where id = ?', [group_id]);
     row = cur.fetchone()
     return jsonify(dict(row))
 
+
+#class Query(graphene.ObjectType):
+    #hello = graphene.String()
+
+    #def resolve_hello(self, args, context, info):
+        #return 'World'
+
+class Group(graphene.ObjectType):
+    name = graphene.String()
+
+
+class Event(graphene.ObjectType):
+    title = graphene.String()
+    location = graphene.String()
+
+
+class User(graphene.ObjectType):
+    id = graphene.Int()
+    username = graphene.String()
+    email = graphene.String()
+    events = graphene.List(Event, args=dict(id=graphene.ID(), event_id=graphene.ID()))
+    groups = graphene.List(Group)
+
+    def resolve_events(self, args, context, info):
+        db = get_db()
+        cur = db.execute("""
+            SELECT title, location
+            FROM events
+            INNER JOIN signups
+            WHERE events.id = signups.event_id
+            AND signups.user_id = ? """, [self.id])
+        events = [dict(event) for event in (cur.fetchall())]
+        return [Event(**event) for event in events]
+
+    def resolve_groups(self, args, context, info):
+        db = get_db()
+        cur = db.execute("""
+            SELECT name
+            FROM groups
+            INNER JOIN memberships
+            WHERE memberships.group_id = groups.id
+            AND memberships.user_id = ? """, [self.id])
+        groups = [dict(group) for group in (cur.fetchall())]
+        return [Group(**group) for group in groups]
+
+class Query(graphene.ObjectType):
+    users = graphene.List(User, args=dict(id=graphene.ID()))
+
+    def resolve_users(self, args, context, info):
+        db = get_db()
+        if 'id' not in args:
+            cur = db.execute("SELECT id, username, email from users");
+            users = [dict(u) for u in (cur.fetchall())]
+            return [User(**u) for u in users]
+
+        cur = db.execute("SELECT id, username, email from users where users.id = ?", [args['id']]);
+        users = [dict(u) for u in (cur.fetchall())]
+        return [User(**u) for u in users]
+
+
+schema = graphene.Schema(query=Query)
+app.add_url_rule('/graphql', view_func=GraphQLView.as_view('graphql', schema=schema, graphiql=True))
