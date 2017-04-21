@@ -109,10 +109,12 @@ def get_group(group_id):
         #return 'World'
 
 class Group(graphene.ObjectType):
+    id = graphene.Int()
     name = graphene.String()
 
 
 class Event(graphene.ObjectType):
+    id = graphene.Int()
     title = graphene.String()
     location = graphene.String()
 
@@ -148,6 +150,7 @@ class User(graphene.ObjectType):
 
 class Query(graphene.ObjectType):
     users = graphene.List(User, args=dict(id=graphene.ID()))
+    groups = graphene.List(Group, args=dict(id=graphene.ID()))
 
     def resolve_users(self, args, context, info):
         db = get_db()
@@ -159,6 +162,17 @@ class Query(graphene.ObjectType):
         cur = db.execute("SELECT id, username, email from users where users.id = ?", [args['id']]);
         users = [dict(u) for u in (cur.fetchall())]
         return [User(**u) for u in users]
+
+    def resolve_groups(self, args, context, info):
+        db = get_db()
+        if 'id' not in args:
+            cur = db.execute("SELECT id, name from groups");
+            groups = [dict(g) for g in (cur.fetchall())]
+            return [Group(**g) for g in groups]
+
+        cur = db.execute("SELECT id, name from groups where groups.id = ?", [args['id']]);
+        users = [dict(u) for u in (cur.fetchall())]
+        return [Group(**u) for u in users]
 
 
 schema = graphene.Schema(query=Query)
