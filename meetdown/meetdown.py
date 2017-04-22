@@ -15,6 +15,7 @@ app.config.update(dict(
     PASSWORD='default'
 ))
 app.config.from_envvar('MEETDOWN_SETTINGS', silent=True)
+app.debug = True
 
 def get_db():
     """Opens a new database connection if there is none yet for the
@@ -148,6 +149,7 @@ class User(graphene.ObjectType):
         groups = [dict(group) for group in (cur.fetchall())]
         return [Group(**group) for group in groups]
 
+
 class Query(graphene.ObjectType):
     users = graphene.List(User, args=dict(id=graphene.ID()))
     groups = graphene.List(Group, args=dict(id=graphene.ID()))
@@ -175,5 +177,26 @@ class Query(graphene.ObjectType):
         return [Group(**u) for u in users]
 
 
-schema = graphene.Schema(query=Query)
+class CreateUser(graphene.Mutation):
+    class Input:
+        username = graphene.String()
+        email = graphene.String()
+
+    ok = graphene.Boolean()
+    user = graphene.Field(lambda: User)
+
+    @staticmethod
+    def mutate(root, args, context, info):
+        user = User(username=args.get('username'), email=args.get('email'))
+        db = get_db()
+        cur = db.execute("INSERT into users (id, username, email) VALUES (null, ?, ?)", [args.get('username'), args.get('email')]),
+        db.commit()
+        ok = True
+        return CreateUser(user=user, ok=ok)
+
+
+class MyMutations(graphene.ObjectType):
+        create_user = CreateUser.Field()
+
+schema = graphene.Schema(query=Query, mutation=MyMutations)
 app.add_url_rule('/graphql', view_func=GraphQLView.as_view('graphql', schema=schema, graphiql=True))
