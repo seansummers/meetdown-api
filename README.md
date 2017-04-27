@@ -2,11 +2,8 @@
 
 Sample app for a Pyladies Toronto talk
 
-# 🌳 dependencies
-- [Graphene](https://github.com/graphql-python/graphene/)
-- [flask-graphql](https://github.com/graphql-python/flask-graphql)
-
 # 🏃 run it
-```
-$ FLASK_APP=meetdown flask run
-```
+1. Install & activate a virtualenv(https://virtualenv.pypa.io/en/latest/installation/)
+1. Install the app `pip install --editable .`
+1. Initalize sqlite db `FLASK_APP=meetdown flask initdb`
+1. Run `FLASK_APP=meetdown flask run`
