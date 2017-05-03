@@ -7,3 +7,4 @@ Sample app for a Pyladies Toronto talk
 1. Install the app `pip install --editable .`
 1. Initalize sqlite db `FLASK_APP=meetdown flask initdb`
 1. Run `FLASK_APP=meetdown flask run`
+1. Connect to http://localhost:5000/graphql
